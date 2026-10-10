@@ -1,5 +1,6 @@
 import { outfits as initialOutfits } from './legacy';
 import { recipes } from './recipes';
+import { monochromeOutfits } from './monochrome';
 
 export const seasons = ['春','夏','秋','冬'] as const;
 export const tastes = ['きれいめ','カジュアル','大人ストリート','ミリタリー','スポーティ','大人シンプル'] as const;
@@ -8,6 +9,14 @@ export const pantsTypes = ['スラックス','デニム','カーゴ','ワイド'
 export const outerTypes = ['テーラードジャケット','ブルゾン','MA-1','ダウン','チェスターコート','ステンカラーコート','カーディガン','その他','なし'] as const;
 export const itemCategories = ['ジャケット','シャツ','Tシャツ','ニット','デニム','カーゴ','ワイドパンツ','アウター','靴','帽子','パンツ','パーカー','スウェット','フリース'] as const;
 export const colorChoices = ['黒','白','グレー','ネイビー','カーキ','ベージュ','ブラウン','ブルー','生成り'] as const;
+export const colorFilters = ['ブラック','ホワイト','モノトーン',...colorChoices] as const;
+export function matchesColor(o: Outfit, color: string): boolean {
+  const garments=[o.top,o.pants,o.outer].filter((i):i is OutfitItem=>i!==null);
+  if(color==='ブラック')return garments.some(i=>i.color==='黒');
+  if(color==='ホワイト')return garments.some(i=>i.color==='白');
+  if(color==='モノトーン')return o.colors.every(c=>['黒','白','グレー'].includes(c));
+  return o.colors.includes(color);
+}
 export interface OutfitItem { category: string; name: string; color: string; brand: 'UNIQLO'|'GU'; productCategory: string; productUrl?: string; }
 export interface Outfit { id: string; name: string; season: typeof seasons[number]; taste: typeof tastes[number]; scenes: (typeof scenes[number])[]; difficulty: 'かんたん'|'ひと工夫'; image: string; imageAlt: string; items: OutfitItem[]; colors: string[]; description: string; avoid: string; top: OutfitItem; pants: OutfitItem; outer: OutfitItem|null; shoes: OutfitItem; hat: OutfitItem|null; pantsType: typeof pantsTypes[number]; outerType: typeof outerTypes[number]; recommended: boolean; imagePrompt?: string; }
 
@@ -226,4 +235,4 @@ export function diversify(list: Outfit[]): Outfit[] {
   while(pool.length){const previous=result.at(-1);let best=0,bestScore=-Infinity;pool.forEach((o,i)=>{const score=previous?(o.taste!==previous.taste?8:0)+(o.season!==previous.season?6:0)+(o.pantsType!==previous.pantsType?4:0)+(o.outerType!==previous.outerType?3:0)+(o.top.name!==previous.top.name?3:0)+(o.scenes[0]!==previous.scenes[0]?2:0)+(o.pants.color!==previous.pants.color?1:0):0;if(score>bestScore){best=i;bestScore=score;}});result.push(pool.splice(best,1)[0]);}
   return result;
 }
-export const outfits: Outfit[] = diversify([...normalizeInitial(),...buildRecipes()]);
+export const outfits: Outfit[] = diversify([...normalizeInitial(),...buildRecipes(),...monochromeOutfits]);
