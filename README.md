@@ -53,3 +53,11 @@ GitHub PagesのSourceをGitHub Actionsに設定します。mainへのpushでデ�
 色フィルターの「ブラック」「ホワイト」はトップス・パンツ・アウターのいずれかに該当色があるコーデです。靴だけが黒でもブラックに含めません。「モノトーン」は帽子と靴も含め、推奨色が黒・白・グレーのみのコーデです。オールブラックも含み、ネイビーは含みません。既存の「黒」「白」は小物を含む色検索として保持します。
 
 追加画像は内蔵imagegenで制作し、`public/images/mono-*.webp` に保存します。生成指定は `IMAGE_PROMPTS_MONOCHROME.md` と各コーデの `imagePrompt` に記録します。
+
+## 画像の最適化（2026-10-11）
+
+元の800px WebP 130枚は内容・名前・パスを維持しています。全ファイルを `backups/images-2026-10-11.zip` に保存し、同名JSONにSHA-256を記録しています。バックアップはpublicの外にあり、サイトの配信対象にはなりません。復元する場合はZIPの内容を `public/images/` へ展開します。
+
+`scripts/optimize_images.py` をPillowのあるPythonで実行すると、既存画像から320・480・640pxの高品質WebPを `public/images/responsive/` に作成します。切り取りや色変更は行いません。処理結果は `IMAGE_OPTIMIZATION.json` に記録します。バックアップがすでにある場合は上書きせず、元画像の一致を確認します。
+
+`src/images.ts` のsrcsetとsizesによって画面幅・画面密度に合う画像を選びます。高密度画面は元の800pxも選択できます。トップのメイン画像は即時読み込み、一覧・おすすめはlazy loading、すべての画像は非同期デコードを使います。レイアウト用の寸法とCSS、画像の表示範囲は変更していません。

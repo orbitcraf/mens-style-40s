@@ -1,8 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { outfits, seasons, tastes, scenes, itemCategories, pantsTypes, outerTypes, colorChoices } from '../src/data';
 import { emptyFilters, filterOutfits } from '../src/filter';
+
+test('every original and responsive image exists, original bytes match backup manifest',()=>{
+  const manifest=JSON.parse(readFileSync('backups/images-2026-10-11.json','utf8')) as {file:string;sha256:string}[];
+  assert.equal(manifest.length,outfits.length);
+  for(const o of outfits){
+    const stem=o.image.slice(o.image.lastIndexOf('/')+1).replace(/\.webp$/,'');
+    for(const width of [320,480,640])assert.ok(existsSync(`public/images/responsive/${stem}-${width}.webp`),`${o.id}/${width}`);
+    const original=manifest.find(r=>r.file===stem+'.webp');
+    assert.ok(original);
+    assert.equal(createHash('sha256').update(readFileSync('public/'+o.image)).digest('hex'),original.sha256);
+  }
+});
 
 test('30 black/white additions and independent color collections',()=>{
   const added=outfits.filter(o=>o.id.startsWith('mono-'));
