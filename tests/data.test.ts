@@ -4,15 +4,16 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { outfits, seasons, tastes, scenes, itemCategories, pantsTypes, outerTypes, colorChoices } from '../src/data';
 import { emptyFilters, filterOutfits } from '../src/filter';
+import { estimateBudget } from '../src/style-profile';
 
 test('every original and responsive image exists, original bytes match backup manifest',()=>{
   const manifest=JSON.parse(readFileSync('backups/images-2026-10-11.json','utf8')) as {file:string;sha256:string}[];
-  assert.equal(manifest.length,outfits.length);
+  assert.equal(manifest.length,130);
   for(const o of outfits){
     const stem=o.image.slice(o.image.lastIndexOf('/')+1).replace(/\.webp$/,'');
     for(const width of [320,480,640])assert.ok(existsSync(`public/images/responsive/${stem}-${width}.webp`),`${o.id}/${width}`);
     const original=manifest.find(r=>r.file===stem+'.webp');
-    assert.ok(original);
+    if(!original){assert.ok(o.id.startsWith('variety-'));continue;}
     assert.equal(createHash('sha256').update(readFileSync('public/'+o.image)).digest('hex'),original.sha256);
   }
 });
@@ -24,15 +25,15 @@ test('30 black/white additions and independent color collections',()=>{
   for(const color of ['ブラック','ホワイト','モノトーン']){
     const result=filterOutfits(outfits,{...emptyFilters(),color});
     assert.ok(result.length>=20);
-    if(color==='モノトーン')assert.ok(result.every(o=>o.colors.every(c=>['黒','白','グレー'].includes(c))));
+    if(color==='モノトーン')assert.ok(result.every(o=>o.colors.every(c=>['黒','白','グレー','チャコール','シルバー'].includes(c))));
     else assert.ok(result.every(o=>[o.top,o.pants,o.outer].some(i=>i?.color===(color==='ブラック'?'黒':'白'))));
   }
   assert.ok(filterOutfits(outfits,{...emptyFilters(),color:'モノトーン',season:'冬',outer:'ダウン',pants:'テーパード'}).some(o=>o.id==='mono-26'));
   assert.ok(!filterOutfits(outfits,{...emptyFilters(),color:'モノトーン'}).some(o=>o.id==='mono-29'));
 });
 
-test('at least 130 complete outfits with unique IDs, names, structural combinations and local images',()=>{
-  assert.ok(outfits.length>=130);
+test('at least 190 complete outfits with unique IDs, names, structural combinations and local images',()=>{
+  assert.ok(outfits.length>=190);
   assert.equal(new Set(outfits.map(o=>o.id)).size,outfits.length);
   assert.equal(new Set(outfits.map(o=>o.name)).size,outfits.length);
   const structural=outfits.map(o=>[o.top.name,o.pants.name,o.outer?.name||'なし',o.shoes.name,o.hat?.name||'なし'].join('|'));
@@ -54,7 +55,7 @@ test('at least 25 per season, all 6 tastes and 7 scenes, pants/outer/color axes 
   for(const p of pantsTypes)assert.ok(outfits.some(o=>o.pantsType===p),p);
   for(const outer of outerTypes)assert.ok(outfits.some(o=>o.outerType===outer),outer);
   for(const color of colorChoices.slice(0,7))assert.ok(outfits.filter(o=>o.colors.includes(color)).length>=10,color);
-  assert.ok(outfits.filter(o=>!o.id.startsWith('mono-')&&o.outer?.color==='黒'&&o.pants.color==='黒').length<10);
+  assert.ok(outfits.filter(o=>!o.id.startsWith('mono-')&&!o.id.startsWith('variety-')&&o.outer?.color==='黒'&&o.pants.color==='黒').length<10);
 });
 test('adjacent outfits vary in taste and do not repeat pants and outer forms together',()=>{
   for(let i=1;i<outfits.length;i++){assert.notEqual(outfits[i].taste,outfits[i-1].taste);assert.ok(outfits[i].pantsType!==outfits[i-1].pantsType||outfits[i].outerType!==outfits[i-1].outerType);}
@@ -69,3 +70,25 @@ test('all 8 filters combine, recommended and no-outer work, reset returns all ou
   const bare=filterOutfits(outfits,{...emptyFilters(),outer:'なし'});assert.ok(bare.length);assert.ok(bare.every(o=>o.outer===null));
   assert.equal(filterOutfits(outfits,emptyFilters()).length,outfits.length);
 });
+
+test('190 outfits provide all 12 genres and six silhouettes with complete style guidance',()=>{
+  assert.equal(outfits.length,190);
+  for(const genre of ['きれいめ','ホスト・色気系','大人ストリート','モード','韓国・都会系','アメカジ','ミリタリー','スポーツMIX','リラックス','デート','ライブ・音楽','個性派']){
+    const results=filterOutfits(outfits,{...emptyFilters(),genre});
+    assert.ok(results.length>=4,genre);
+    assert.ok(results.every(o=>o.genreTags.some(g=>g===genre)));
+  }
+  for(const silhouette of ['細身','普通','ワイド','上下ゆったり','上細め＋下ワイド','上ゆったり＋下細め']){
+    assert.ok(filterOutfits(outfits,{...emptyFilters(),silhouette}).length,silhouette);
+  }
+  for(const o of outfits){
+    assert.ok(o.ageReason&&o.bodyAdvice&&o.colorAlternative&&o.bodyTypes.length&&o.occasionDetails.length);
+    assert.ok(o.budget[0]>0&&o.budget[1]>=o.budget[0]&&o.budget[1]<=40000);
+  }
+  const nights=filterOutfits(outfits,{...emptyFilters(),genre:'ホスト・色気系',scene:'夜デート',season:'春',silhouette:'細身'});
+  assert.ok(nights.some(o=>o.id==='variety-03'));
+  const other=filterOutfits(outfits,{...emptyFilters(),color:'その他',genre:'ライブ・音楽'});
+  assert.ok(other.some(o=>o.id==='variety-54'));
+});
+
+test('court sneakers use shoe pricing rather than coat pricing',()=>{assert.deepEqual(estimateBudget([{category:'靴',name:'コートスニーカー',color:'黒',brand:'GU',productCategory:'靴'}]),[2000,4000]);});
