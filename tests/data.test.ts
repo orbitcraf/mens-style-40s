@@ -99,10 +99,13 @@ test('winter addition preserves all 190 existing outfits, images, UI files and f
   assert.deepEqual(outfits.slice(0,190),baseline);
   const files=JSON.parse(readFileSync('backups/winter-additions-2026-10-23/files.json','utf8')) as Record<string,string>;
   for(const [file,hash] of Object.entries(files)){
-    if(file.startsWith('public/')||['src/main.ts','src/style.css','src/images.ts','index.html'].includes(file)){
+    if(file.startsWith('public/')){
       assert.equal(createHash('sha256').update(readFileSync(file)).digest('hex'),hash,file);
     }
   }
+  // Git checks out CRLF on Windows and LF on Linux; compare UI text with normalized line endings.
+  const textFiles=JSON.parse(readFileSync('backups/winter-additions-2026-10-23/text-files.json','utf8')) as Record<string,string>;
+  for(const [file,hash] of Object.entries(textFiles))assert.equal(createHash('sha256').update(readFileSync(file,'utf8').replace(/\r\n/g,'\n')).digest('hex'),hash,file);
   assert.deepEqual(filterOutfits(outfits,emptyFilters()).slice(0,190).map(o=>o.id),JSON.parse(readFileSync('backups/winter-additions-2026-10-23/order.json','utf8')));
   for(const [key,values] of Object.entries({season:seasons,taste:tastes,scene:scenes,item:itemCategories,color:colorChoices,pants:pantsTypes,outer:outerTypes})){
     for(const value of values){
