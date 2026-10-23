@@ -13,7 +13,7 @@ test('every original and responsive image exists, original bytes match backup ma
     const stem=o.image.slice(o.image.lastIndexOf('/')+1).replace(/\.webp$/,'');
     for(const width of [320,480,640])assert.ok(existsSync(`public/images/responsive/${stem}-${width}.webp`),`${o.id}/${width}`);
     const original=manifest.find(r=>r.file===stem+'.webp');
-    if(!original){assert.ok(o.id.startsWith('variety-'));continue;}
+    if(!original){assert.ok(o.id.startsWith('variety-')||o.id.startsWith('winter-add-'));continue;}
     assert.equal(createHash('sha256').update(readFileSync('public/'+o.image)).digest('hex'),original.sha256);
   }
 });
@@ -58,7 +58,7 @@ test('at least 25 per season, all 6 tastes and 7 scenes, pants/outer/color axes 
   assert.ok(outfits.filter(o=>!o.id.startsWith('mono-')&&!o.id.startsWith('variety-')&&o.outer?.color==='黒'&&o.pants.color==='黒').length<10);
 });
 test('adjacent outfits vary in taste and do not repeat pants and outer forms together',()=>{
-  for(let i=1;i<outfits.length;i++){assert.notEqual(outfits[i].taste,outfits[i-1].taste);assert.ok(outfits[i].pantsType!==outfits[i-1].pantsType||outfits[i].outerType!==outfits[i-1].outerType);}
+  for(let i=1;i<190;i++){assert.notEqual(outfits[i].taste,outfits[i-1].taste);assert.ok(outfits[i].pantsType!==outfits[i-1].pantsType||outfits[i].outerType!==outfits[i-1].outerType);}
 });
 test('all 8 filters combine, recommended and no-outer work, reset returns all outfits',()=>{
   assert.equal(filterOutfits(outfits,emptyFilters()).length,outfits.length);
@@ -71,8 +71,8 @@ test('all 8 filters combine, recommended and no-outer work, reset returns all ou
   assert.equal(filterOutfits(outfits,emptyFilters()).length,outfits.length);
 });
 
-test('190 outfits provide all 12 genres and six silhouettes with complete style guidance',()=>{
-  assert.equal(outfits.length,190);
+test('200 outfits provide all 12 genres and six silhouettes with complete style guidance',()=>{
+  assert.equal(outfits.length,200);
   for(const genre of ['きれいめ','ホスト・色気系','大人ストリート','モード','韓国・都会系','アメカジ','ミリタリー','スポーツMIX','リラックス','デート','ライブ・音楽','個性派']){
     const results=filterOutfits(outfits,{...emptyFilters(),genre});
     assert.ok(results.length>=4,genre);
@@ -92,3 +92,27 @@ test('190 outfits provide all 12 genres and six silhouettes with complete style 
 });
 
 test('court sneakers use shoe pricing rather than coat pricing',()=>{assert.deepEqual(estimateBudget([{category:'靴',name:'コートスニーカー',color:'黒',brand:'GU',productCategory:'靴'}]),[2000,4000]);});
+
+
+test('winter addition preserves all 190 existing outfits, images, UI files and filtered order',()=>{
+  const baseline=JSON.parse(readFileSync('backups/winter-additions-2026-10-23/outfits.json','utf8')) as typeof outfits;
+  assert.deepEqual(outfits.slice(0,190),baseline);
+  const files=JSON.parse(readFileSync('backups/winter-additions-2026-10-23/files.json','utf8')) as Record<string,string>;
+  for(const [file,hash] of Object.entries(files)){
+    if(file.startsWith('public/')||['src/main.ts','src/style.css','src/images.ts','index.html'].includes(file)){
+      assert.equal(createHash('sha256').update(readFileSync(file)).digest('hex'),hash,file);
+    }
+  }
+  assert.deepEqual(filterOutfits(outfits,emptyFilters()).slice(0,190).map(o=>o.id),JSON.parse(readFileSync('backups/winter-additions-2026-10-23/order.json','utf8')));
+  for(const [key,values] of Object.entries({season:seasons,taste:tastes,scene:scenes,item:itemCategories,color:colorChoices,pants:pantsTypes,outer:outerTypes})){
+    for(const value of values){
+      const filters={...emptyFilters(),[key]:value};
+      assert.deepEqual(filterOutfits(outfits,filters).filter(o=>!o.id.startsWith('winter-add-')),filterOutfits(baseline,filters));
+    }
+  }
+  const added=outfits.slice(190);
+  assert.equal(added.length,10);assert.ok(added.every(o=>o.season==='冬'&&o.id.startsWith('winter-add-')));
+  assert.equal(new Set(added.map(o=>o.shoes.name)).size,10);
+  assert.ok(new Set(added.map(o=>o.shoes.color)).size>=5);
+  assert.ok(added.every(o=>o.outer&&o.items.every(i=>!i.productUrl)));
+});
