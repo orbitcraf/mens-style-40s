@@ -13,7 +13,7 @@ test('every original and responsive image exists, original bytes match backup ma
     const stem=o.image.slice(o.image.lastIndexOf('/')+1).replace(/\.webp$/,'');
     for(const width of [320,480,640])assert.ok(existsSync(`public/images/responsive/${stem}-${width}.webp`),`${o.id}/${width}`);
     const original=manifest.find(r=>r.file===stem+'.webp');
-    if(!original){assert.ok(o.id.startsWith('variety-')||o.id.startsWith('winter-add-'));continue;}
+    if(!original){assert.ok(o.id.startsWith('variety-')||o.id.startsWith('winter-add-')||o.id.startsWith('season-add-'));continue;}
     assert.equal(createHash('sha256').update(readFileSync('public/'+o.image)).digest('hex'),original.sha256);
   }
 });
@@ -71,8 +71,8 @@ test('all 8 filters combine, recommended and no-outer work, reset returns all ou
   assert.equal(filterOutfits(outfits,emptyFilters()).length,outfits.length);
 });
 
-test('200 outfits provide all 12 genres and six silhouettes with complete style guidance',()=>{
-  assert.equal(outfits.length,200);
+test('230 outfits provide all 12 genres and six silhouettes with complete style guidance',()=>{
+  assert.equal(outfits.length,230);
   for(const genre of ['きれいめ','ホスト・色気系','大人ストリート','モード','韓国・都会系','アメカジ','ミリタリー','スポーツMIX','リラックス','デート','ライブ・音楽','個性派']){
     const results=filterOutfits(outfits,{...emptyFilters(),genre});
     assert.ok(results.length>=4,genre);
@@ -110,12 +110,41 @@ test('winter addition preserves all 190 existing outfits, images, UI files and f
   for(const [key,values] of Object.entries({season:seasons,taste:tastes,scene:scenes,item:itemCategories,color:colorChoices,pants:pantsTypes,outer:outerTypes})){
     for(const value of values){
       const filters={...emptyFilters(),[key]:value};
-      assert.deepEqual(filterOutfits(outfits,filters).filter(o=>!o.id.startsWith('winter-add-')),filterOutfits(baseline,filters));
+      assert.deepEqual(filterOutfits(outfits,filters).filter(o=>!o.id.startsWith('winter-add-')&&!o.id.startsWith('season-add-')),filterOutfits(baseline,filters));
     }
   }
-  const added=outfits.slice(190);
+  const added=outfits.slice(190,200);
   assert.equal(added.length,10);assert.ok(added.every(o=>o.season==='冬'&&o.id.startsWith('winter-add-')));
   assert.equal(new Set(added.map(o=>o.shoes.name)).size,10);
   assert.ok(new Set(added.map(o=>o.shoes.color)).size>=5);
   assert.ok(added.every(o=>o.outer&&o.items.every(i=>!i.productUrl)));
+});
+
+
+test('30 seasonal additions preserve all 200 existing records, assets and UI',async()=>{
+  const {seasonalAdditions}=await import('../src/seasonal-additions');
+  const baseline=JSON.parse(readFileSync('backups/additions-2026-11-13/outfits.json','utf8')) as typeof outfits;
+  assert.equal(baseline.length,200);assert.deepEqual(outfits.slice(0,200),baseline);
+  assert.equal(seasonalAdditions.length,30);
+  assert.deepEqual(seasons.map(season=>seasonalAdditions.filter(o=>o.season===season).length),[8,8,7,7]);
+  const files=JSON.parse(readFileSync('backups/additions-2026-11-13/files.json','utf8')) as Record<string,string>;
+  for(const [file,hash] of Object.entries(files)){
+    if(!file.startsWith('public/')&&!['src/main.ts','src/style.css','src/images.ts','src/category-links.ts','src/style-profile.ts','src/legacy.ts','src/recipes.ts','src/monochrome.ts','src/variety.ts','src/winter-additions.ts','index.html','package.json','vite.config.ts'].includes(file))continue;
+    const bytes=file.endsWith('.webp')?readFileSync(file):readFileSync(file,'utf8').replace(/\r\n/g,'\n');
+    assert.equal(createHash('sha256').update(bytes).digest('hex'),hash,file);
+  }
+  assert.deepEqual(filterOutfits(outfits,emptyFilters()).slice(0,200).map(o=>o.id),JSON.parse(readFileSync('backups/additions-2026-11-13/order.json','utf8')));
+  for(const [key,values] of Object.entries({season:seasons,taste:tastes,scene:scenes,item:itemCategories,color:colorChoices,pants:pantsTypes,outer:outerTypes,genre:['きれいめ','大人ストリート','リラックス','ミリタリー','モード'],silhouette:['普通','ワイド','細身']})){
+    for(const value of values){const filters={...emptyFilters(),[key]:value};assert.deepEqual(filterOutfits(outfits,filters).filter(o=>!o.id.startsWith('season-add-')),filterOutfits(baseline,filters));}
+  }
+  for(const o of seasonalAdditions){
+    assert.ok(o.id.startsWith('season-add-'));assert.ok(o.description.includes('参考商品・参考価格'));
+    assert.equal(o.referencePricing.items.length,o.items.length);
+    assert.equal(o.referencePricing.total,o.referencePricing.items.reduce((n,i)=>n+i.yen,0));
+    assert.ok(o.budget[0]<=o.referencePricing.total&&o.budget[1]>=o.referencePricing.total);
+    assert.ok(o.description.includes('参考合計：'+o.referencePricing.total.toLocaleString('ja-JP')+'円'));
+    assert.ok(o.items.every(i=>['UNIQLO','GU'].includes(i.brand)));
+    const stem=o.image.split('/').at(-1)!.replace('.webp','');
+    for(const width of [320,480,640])assert.ok(existsSync('public/images/responsive/'+stem+'-'+width+'.webp'));
+  }
 });

@@ -3,6 +3,7 @@ import { recipes } from './recipes';
 import { monochromeOutfits } from './monochrome';
 import { varietyOutfits } from './variety';
 import { winterAdditions } from './winter-additions';
+import { seasonalAdditions } from './seasonal-additions';
 import { existingProfile, type StyleProfile } from './style-profile';
 export { genres, silhouettes } from './style-profile';
 
@@ -249,4 +250,4 @@ for(let i=0;i<Math.max(archivedOutfits.length,varietyOutfits.length);i++){
   if(varietyOutfits[i])mixed.push(varietyOutfits[i]);
   if(archivedOutfits[i])mixed.push(archivedOutfits[i]);
 }
-export const outfits:StyledOutfit[]=[...diversify(mixed) as StyledOutfit[],...winterAdditions];
+export const outfits:StyledOutfit[]=[...diversify(mixed) as StyledOutfit[],...winterAdditions,...seasonalAdditions];
